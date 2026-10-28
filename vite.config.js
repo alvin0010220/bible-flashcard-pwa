@@ -3,12 +3,16 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/bible-flashcard-pwa/', // 新增這一行（前後都要有斜線）
+  base: './',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'Bible-niv-main/*.json'],
+      includeAssets: ['favicon.svg'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,svg,json}']
+      },
       manifest: {
         name: '聖經背誦字卡 PWA (Bible Flashcard)',
         short_name: '聖經字卡',

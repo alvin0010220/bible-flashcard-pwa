@@ -1,5 +1,5 @@
-import { bibleSearch } from './ChineseBibleSearchJS/bibleSearch.js';
-import { bibleIndexes } from './ChineseBibleSearchJS/bibleIndexes.js';
+import bibleSearch from './ChineseBibleSearchJS/bibleSearch.js';
+import bibleIndexes from './ChineseBibleSearchJS/bibleIndexes.js';
 import { normalizeQueryToChineseBibleSearch } from './bookAbbreviations.js';
 
 const nivBookCache = new Map();
@@ -57,7 +57,9 @@ export async function searchBilingualVerse(rawQuery) {
   const enBookName = bookMeta.enName;
   let nivBookData = nivBookCache.get(enBookName);
   if (!nivBookData) {
-    const res = await fetch(`/Bible-niv-main/${encodeURIComponent(enBookName)}.json`);
+    const baseUrl = import.meta.env?.BASE_URL || '/';
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const res = await fetch(`${normalizedBase}Bible-niv-main/${encodeURIComponent(enBookName)}.json`);
     if (!res.ok) {
       return { ok: false, error: `無法載入英文經文檔案：${enBookName}.json` };
     }
@@ -89,7 +91,7 @@ export async function searchBilingualVerse(rawQuery) {
       zhShortRef: `${bookMeta.zhShort} ${chapter}:${verse}`,
       enRef: `${bookMeta.enName} ${chapter}:${verse}`,
       zhText: zhLines[0].text,
-      enText: verseObj.text
+      enText: verseObj.text.replace(/`/g, "'")
     }
   };
 }

@@ -1,12 +1,7 @@
-(function(root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define(['./bibleText', './bibleIndexes'], factory);
-  } else if (typeof exports === 'object') {
-    module.exports = factory(require('./bibleText'), require('./bibleIndexes'));
-  } else {
-    root.bibleSearch = factory(root.bibleText, root.bibleIndexes);
-  }
-}(this, function(bibleText, bibleIndexes) {
+import bibleText from './bibleText.js';
+import bibleIndexes from './bibleIndexes.js';
+
+const createBibleSearch = function(bibleText, bibleIndexes) {
   var Searcher = {
     onError: function(err, source) {
       console.error(source ? err + ": " + source : err);
@@ -150,4 +145,7 @@ var find = function(bookName, iChapterIndex1, iLine1, iChapterIndex2, iLine2) {
   Searcher.indexSearch = indexSearch;
   Searcher.setOptions = setOptions
   return Searcher;
-}));
+};
+const bibleSearch = createBibleSearch(bibleText, bibleIndexes);
+export { bibleSearch, createBibleSearch };
+export default bibleSearch;

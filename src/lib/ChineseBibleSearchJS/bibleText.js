@@ -2,15 +2,7 @@
  * The bible text is from:
  * http://springbible.fhl.net/OfflineBible/offline.html
  ********************************************/
-(function(root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define(factory);
-  } else if (typeof exports === 'object') {
-    module.exports = factory();
-  } else {
-    root.bibleText = factory();
-  }
-}(this, function() {
+const createBibleText = function() {
   return new Array(
     '創1:1 起初，神創造天地。',
     '創1:2 地是空虛混沌，淵面黑暗；神的靈運行在水面上。',
@@ -31116,4 +31108,7 @@
     '啟22:20 證明這事的說：是了，我必快來！阿們！主耶穌啊，我願你來！',
     '啟22:21 願主耶穌的恩惠常與眾聖徒同在。阿們！'
   );
-}));
+};
+const bibleText = createBibleText();
+export { bibleText };
+export default bibleText;

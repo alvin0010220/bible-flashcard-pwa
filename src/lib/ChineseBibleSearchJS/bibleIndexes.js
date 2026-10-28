@@ -2,15 +2,7 @@
  * The bible indexes are from:
  * http://springbible.fhl.net/OfflineBible/offline.html
  ********************************************/
-(function(root, factory) {
-	if (typeof define === 'function' && define.amd) {
-		define(factory);
-	} else if (typeof exports === 'object') {
-		module.exports = factory();
-	} else {
-		root.bibleIndexes = factory();
-	}
-}(this, function() {
+const createBibleIndexes = function() {
 	var books = new Array(
 		'創世記',
 		'出埃及記',
@@ -2769,7 +2761,7 @@
 		if (start < 0) return [start, 0];
 		var end = searchLine(bookIndex, chapterIndex2, line2);
 		if (end < 0) return [start, end];
-		return [min(start, end), max(start, end)];
+		return [Math.min(start, end), Math.max(start, end)];
 	};
 	return {
 		books: books,
@@ -2787,4 +2779,7 @@
 		searchLine: searchLine,
 		search: search
 	};
-}));
+};
+const bibleIndexes = createBibleIndexes();
+export { bibleIndexes };
+export default bibleIndexes;
