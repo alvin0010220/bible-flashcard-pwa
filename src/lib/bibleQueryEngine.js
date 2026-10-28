@@ -1,5 +1,5 @@
-import bibleSearch from './ChineseBibleSearchJS/bibleSearch.js';
-import bibleIndexes from './ChineseBibleSearchJS/bibleIndexes.js';
+import { bibleSearch } from './ChineseBibleSearchJS/bibleSearch.js';
+import { bibleIndexes } from './ChineseBibleSearchJS/bibleIndexes.js';
 import { normalizeQueryToChineseBibleSearch } from './bookAbbreviations.js';
 
 const nivBookCache = new Map();
