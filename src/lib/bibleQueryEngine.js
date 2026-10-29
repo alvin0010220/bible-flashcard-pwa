@@ -3,10 +3,36 @@ import bibleIndexes from './ChineseBibleSearchJS/bibleIndexes.js';
 import { normalizeQueryToChineseBibleSearch } from './bookAbbreviations.js';
 
 const nivBookCache = new Map();
+const nkjvBookCache = new Map();
+
+async function fetchBookJsonFromDir(dirName, enBookName, cacheMap) {
+  if (cacheMap.has(enBookName)) return cacheMap.get(enBookName);
+  const baseUrl = import.meta.env?.BASE_URL || '/';
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  try {
+    const res = await fetch(`${normalizedBase}${dirName}/${encodeURIComponent(enBookName)}.json`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && Array.isArray(data.chapters)) {
+      cacheMap.set(enBookName, data);
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function extractVerseFromBookJson(bookData, chapter, verse) {
+  if (!bookData || !Array.isArray(bookData.chapters)) return null;
+  const chObj = bookData.chapters.find((c) => String(c.chapter) === String(chapter));
+  const vObj = chObj?.verses?.find((v) => String(v.verse) === String(verse));
+  return vObj?.text ? String(vObj.text).replace(/`/g, "'") : null;
+}
 
 /**
- * 結合 ChineseBibleSearchJS 模組與 Bible-niv-main 目錄下的書卷 JSON 檔案，
- * 解析中英縮寫（如 Eph3:3 或 弗3:3）並提取中英對照單節經文。
+ * 結合 ChineseBibleSearchJS 模組與 Bible-nkjv-main / Bible-niv-main 目錄下的 66 卷 JSON 檔案，
+ * 解析中英縮寫（如 Eph3:3 或 弗3:3）並同時提取 CUNP、NKJV 與 NIV 對照單節經文。
  */
 export async function searchBilingualVerse(rawQuery) {
   const parsed = normalizeQueryToChineseBibleSearch(rawQuery);
@@ -24,16 +50,13 @@ export async function searchBilingualVerse(rawQuery) {
 
   // 1. 透過 ChineseBibleSearchJS-master 執行檢索與驗證
   let searchError = null;
-  let zhTitle = '';
   const zhLines = [];
 
   bibleSearch.setOptions({
     onError: (err, source) => {
       searchError = source ? `${err} (${source})` : err;
     },
-    onTitle: (title) => {
-      zhTitle = title;
-    },
+    onTitle: () => {},
     onTextLine: (prefix, text) => {
       zhLines.push({ prefix, text });
     }
@@ -53,34 +76,22 @@ export async function searchBilingualVerse(rawQuery) {
     };
   }
 
-  // 2. 從 Bible-niv-main 對應書卷 JSON 檔案提取英文經文
   const enBookName = bookMeta.enName;
-  let nivBookData = nivBookCache.get(enBookName);
-  if (!nivBookData) {
-    const baseUrl = import.meta.env?.BASE_URL || '/';
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const res = await fetch(`${normalizedBase}Bible-niv-main/${encodeURIComponent(enBookName)}.json`);
-    if (!res.ok) {
-      return { ok: false, error: `無法載入英文經文檔案：${enBookName}.json` };
-    }
-    nivBookData = await res.json();
-    nivBookCache.set(enBookName, nivBookData);
-  }
+  const verseKey = `${enBookName}-${chapter}-${verse}`;
 
-  const chapterObj = nivBookData.chapters.find(c => String(c.chapter) === String(chapter));
-  const verseObj = chapterObj?.verses?.find(v => String(v.verse) === String(verse));
+  // 2. 平行載入 NKJV (public/Bible-nkjv-main/<Book>.json) 與 NIV (public/Bible-niv-main/<Book>.json)
+  const [nkjvBookData, nivBookData] = await Promise.all([
+    fetchBookJsonFromDir('Bible-nkjv-main', enBookName, nkjvBookCache),
+    fetchBookJsonFromDir('Bible-niv-main', enBookName, nivBookCache)
+  ]);
 
-  if (!verseObj) {
-    return {
-      ok: false,
-      error: `NIV 資料庫中找不到 ${enBookName} ${chapter}:${verse}`
-    };
-  }
+  const nkjvText = extractVerseFromBookJson(nkjvBookData, chapter, verse) || '';
+  const nivText = extractVerseFromBookJson(nivBookData, chapter, verse) || '';
 
   return {
     ok: true,
     data: {
-      id: `${bookMeta.enName}-${chapter}-${verse}`,
+      id: verseKey,
       bookIndex: bookMeta.index,
       zhFull: bookMeta.zhFull,
       zhShort: bookMeta.zhShort,
@@ -91,7 +102,9 @@ export async function searchBilingualVerse(rawQuery) {
       zhShortRef: `${bookMeta.zhShort} ${chapter}:${verse}`,
       enRef: `${bookMeta.enName} ${chapter}:${verse}`,
       zhText: zhLines[0].text,
-      enText: verseObj.text.replace(/`/g, "'")
+      nkjvText,
+      nivText,
+      enText: nkjvText || nivText
     }
   };
 }

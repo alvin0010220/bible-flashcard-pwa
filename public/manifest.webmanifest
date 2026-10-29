@@ -1,7 +1,7 @@
 {
-  "name": "聖經背誦字卡 PWA (Bible Flashcard)",
-  "short_name": "聖經字卡",
-  "start_url": "/",
+  "name": "聖經背誦字卡 ｜ CUNP & NKJV & NIV",
+  "short_name": "聖經背誦字卡",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#4f46e5",

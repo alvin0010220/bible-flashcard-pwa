@@ -1,19 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { Search, BookOpen, Layers, CheckCircle2, Clock, Trash2, RotateCw, Sparkles, ArrowRight } from 'lucide-react';
+import {
+  Search,
+  BookOpen,
+  Layers,
+  Shuffle,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { searchBilingualVerse } from './lib/bibleQueryEngine.js';
 import Flashcard3D from './components/Flashcard3D.jsx';
 
 const STORAGE_KEY = 'bible_flashcards_mvp_v1';
-
+const VERSION_STORAGE_KEY = 'bible_flashcards_en_version_v1';
 const QUICK_EXAMPLES = ['Eph3:3', '弗3:3', '約3:16', 'Rom8:28', '詩23:1', '腓4:13'];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('search'); // 'search' | 'deck'
+  const [enVersion, setEnVersion] = useState(() => {
+    try {
+      const v = localStorage.getItem(VERSION_STORAGE_KEY);
+      return v === 'NIV' || v === 'NKJV' ? v : 'NKJV';
+    } catch {
+      return 'NKJV';
+    }
+  });
   const [query, setQuery] = useState('Eph3:3');
   const [currentVerse, setCurrentVerse] = useState(null);
   const [isFlipped, setIsFlipped] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // 卡牌庫 Flashcard 背誦狀態
   const [deckFilter, setDeckFilter] = useState('all'); // 'all' | 'review' | 'memorized'
+  const [deckIndex, setDeckIndex] = useState(0);
+  const [deckFlipped, setDeckFlipped] = useState(false);
+  const [deckQuizHideText, setDeckQuizHideText] = useState(true);
+  const [deckRevealed, setDeckRevealed] = useState(false);
+
   const [cards, setCards] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -30,6 +52,14 @@ export default function App() {
       console.error('LocalStorage save failed', e);
     }
   }, [cards]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VERSION_STORAGE_KEY, enVersion);
+    } catch (e) {
+      console.error('LocalStorage version save failed', e);
+    }
+  }, [enVersion]);
 
   useEffect(() => {
     handleSearch('Eph3:3');
@@ -77,29 +107,57 @@ export default function App() {
 
   function removeCard(id) {
     setCards(cards.filter((c) => c.id !== id));
+    setDeckFlipped(false);
+    setDeckRevealed(false);
   }
 
   const savedCard = currentVerse ? cards.find((c) => c.id === currentVerse.id) : null;
+  const filteredCards = cards.filter((c) => (deckFilter === 'all' ? true : c.status === deckFilter));
+  const safeDeckIndex = filteredCards.length > 0 ? Math.min(deckIndex, filteredCards.length - 1) : 0;
+  const activeDeckCard = filteredCards[safeDeckIndex] || null;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col max-w-md mx-auto border-x border-slate-200/70 shadow-sm">
       {/* 頂部導覽列 */}
-      <header className="px-4 pt-4 pb-3 bg-white border-b border-slate-200/80 sticky top-0 z-20 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shadow-indigo-600/30">
-            <BookOpen className="w-5 h-5" />
+      <header className="px-3.5 pt-3.5 pb-3 bg-white border-b border-slate-200/80 sticky top-0 z-20 flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shadow-indigo-600/30 shrink-0">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-slate-900 leading-tight truncate">
+                聖經背誦字卡 ｜ CUNP &amp; NKJV &amp; NIV
+              </h1>
+              <p className="text-[11px] text-slate-500 truncate">
+                新標點和合本 CUNP · {enVersion} 雙語對照
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">聖經背誦字卡</h1>
-            <p className="text-[11px] text-slate-500">CUV 和合本 & NIV 雙語對照</p>
+
+          {/* 英文譯本選擇器 (預設 NKJV) */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200 shrink-0">
+            {(['NKJV', 'NIV']).map((ver) => (
+              <button
+                key={ver}
+                type="button"
+                onClick={() => setEnVersion(ver)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                  enVersion === ver ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600'
+                }`}
+              >
+                {ver}
+              </button>
+            ))}
           </div>
         </div>
+
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => setActiveTab('search')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeTab === 'search' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+              activeTab === 'search' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-600'
             }`}
           >
             經文檢索
@@ -107,11 +165,11 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveTab('deck')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
-              activeTab === 'deck' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 ${
+              activeTab === 'deck' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-600'
             }`}
           >
-            <span>卡牌庫</span>
+            <span>卡牌庫背誦</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-700">
               {cards.length}
             </span>
@@ -137,7 +195,7 @@ export default function App() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="輸入中英縮寫，如 Eph3:3 或 弗3:3..."
-                  className="w-full pl-10 pr-20 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm"
+                  className="w-full pl-10 pr-20 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs"
                 />
                 <button
                   type="submit"
@@ -174,6 +232,7 @@ export default function App() {
             <div className="my-auto py-2">
               <Flashcard3D
                 verseData={currentVerse}
+                enVersion={enVersion}
                 isFlipped={isFlipped}
                 onFlip={() => setIsFlipped(!isFlipped)}
                 isSaved={Boolean(savedCard)}
@@ -197,9 +256,10 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
+          <div className="flex-1 flex flex-col justify-between gap-3">
+            {/* 狀態篩選與默背遮罩控制 */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-1.5">
                 {[
                   { key: 'all', label: `全部 (${cards.length})` },
                   { key: 'review', label: `待複習 (${cards.filter((c) => c.status === 'review').length})` },
@@ -208,8 +268,13 @@ export default function App() {
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setDeckFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    onClick={() => {
+                      setDeckFilter(tab.key);
+                      setDeckIndex(0);
+                      setDeckFlipped(false);
+                      setDeckRevealed(false);
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition ${
                       deckFilter === tab.key
                         ? 'bg-indigo-600 text-white'
                         : 'bg-white border border-slate-200 text-slate-600'
@@ -219,48 +284,78 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              {filteredCards.length > 0 && (
+                <div className="px-3 py-2 rounded-2xl bg-white border border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-indigo-700">
+                    第 {safeDeckIndex + 1} / {filteredCards.length} 張
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeckQuizHideText(!deckQuizHideText);
+                      setDeckRevealed(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-semibold flex items-center gap-1"
+                  >
+                    {deckQuizHideText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{deckQuizHideText ? '默背遮罩：開啟' : '默背遮罩：關閉'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (filteredCards.length > 1) {
+                        const next = Math.floor(Math.random() * filteredCards.length);
+                        setDeckIndex(next);
+                        setDeckFlipped(false);
+                        setDeckRevealed(false);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-semibold flex items-center gap-1"
+                  >
+                    <Shuffle className="w-3.5 h-3.5" />
+                    <span>抽背</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2.5 mt-1">
-              {cards
-                .filter((c) => (deckFilter === 'all' ? true : c.status === deckFilter))
-                .map((card) => (
-                  <div
-                    key={card.id}
-                    className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-bold text-slate-800">{card.zhRef}</span>
-                        <span className="ml-2 text-xs text-slate-400">{card.enRef}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleCardStatus(card.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                            card.status === 'memorized'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
-                        >
-                          {card.status === 'memorized' ? '已熟記' : '待複習'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeCard(card.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 transition"
-                          title="刪除"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-700 leading-relaxed">{card.zhText}</p>
-                    <p className="text-xs text-slate-500 italic leading-relaxed">{card.enText}</p>
-                  </div>
-                ))}
-            </div>
+            {!activeDeckCard ? (
+              <div className="my-auto py-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-6">
+                <Layers className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">目前沒有符合條件的背誦字卡</p>
+              </div>
+            ) : (
+              <div className="my-auto py-1">
+                <Flashcard3D
+                  verseData={activeDeckCard}
+                  enVersion={enVersion}
+                  isFlipped={deckFlipped}
+                  onFlip={() => setDeckFlipped(!deckFlipped)}
+                  isSaved={true}
+                  savedStatus={activeDeckCard.status}
+                  onToggleSave={() => toggleCardStatus(activeDeckCard.id)}
+                  prevLabel="上一張"
+                  nextLabel="下一張"
+                  quizHideText={deckQuizHideText}
+                  quizRevealed={deckRevealed}
+                  onRevealQuiz={() => setDeckRevealed(true)}
+                  onDeleteCard={() => removeCard(activeDeckCard.id)}
+                  onPrevVerse={() => {
+                    const nextIdx = (safeDeckIndex - 1 + filteredCards.length) % filteredCards.length;
+                    setDeckIndex(nextIdx);
+                    setDeckFlipped(false);
+                    setDeckRevealed(false);
+                  }}
+                  onNextVerse={() => {
+                    const nextIdx = (safeDeckIndex + 1) % filteredCards.length;
+                    setDeckIndex(nextIdx);
+                    setDeckFlipped(false);
+                    setDeckRevealed(false);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>
